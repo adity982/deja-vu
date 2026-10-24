@@ -81,6 +81,35 @@ func TestParseGeminiJSONLWithRewind(t *testing.T) {
 	}
 }
 
+// Gemini 0.64 repeats earlier function responses under fresh message ids when
+// a session is resumed. The repeated record must not duplicate tool output.
+func TestGeminiResumeDedupesFunctionResponses(t *testing.T) {
+	_, chats := geminiTree(t)
+	lines := `{"sessionId":"sess-resume-output","projectHash":"abc","startTime":"2026-10-18T05:25:29.000Z","lastUpdated":"2026-10-18T05:25:39.066Z","kind":"main"}
+{"id":"g1","timestamp":"2026-10-18T05:25:30.000Z","type":"gemini","content":"","toolCalls":[{"id":"write_file_1","name":"write_file","args":{"file_path":"parent.txt","content":"PARENT_LINE"}}]}
+{"id":"u1","timestamp":"2026-10-18T05:25:30.384Z","type":"user","content":[{"functionResponse":{"id":"write_file_1","name":"write_file","response":{"output":"Successfully wrote parent.txt"}}}]}
+{"id":"g2","timestamp":"2026-10-18T05:25:31.000Z","type":"gemini","content":"Created parent.txt."}
+{"id":"u1_response","timestamp":"2026-10-18T05:25:39.066Z","type":"user","content":[{"functionResponse":{"id":"write_file_1","name":"write_file","response":{"output":"Successfully wrote parent.txt"}}}]}
+`
+	p := filepath.Join(chats, "session-2026-10-18T05-25-sess-resume-output.jsonl")
+	if err := os.WriteFile(p, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseGeminiFile(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("parse: %v, %d sessions", err, len(ss))
+	}
+	outputs := 0
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleToolOutput {
+			outputs++
+		}
+	}
+	if outputs != 1 {
+		t.Fatalf("tool outputs = %d, want 1: %#v", outputs, ss[0].Messages)
+	}
+}
+
 func TestGeminiProjectFromRegistry(t *testing.T) {
 	root, chats := geminiTree(t)
 	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(`{"projects":{"/Users/x/work/cool-app":"my-proj"}}`), 0o644); err != nil {
