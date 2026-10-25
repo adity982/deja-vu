@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A resumed Gemini CLI session no longer shows and indexes each tool result
+  twice. Gemini writes the earlier function responses again under new message
+  ids, and those are now dropped by call id. The index is rebuilt once on
+  upgrade. From @adity982 (#5318, #5618).
+
 ## [0.23.1] - 2026-10-25
 
 Big stores build and search for less. A cold build peaks at half the memory
